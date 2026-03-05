@@ -127,7 +127,7 @@ final List<Map<String, dynamic>> kSeedQuestions = [
   _mcq('h_e_007', 'history', 'easy', 'What year did man first land on the Moon?', ['1965', '1967', '1969', '1971'], '1969'),
   _tf('h_e_008', 'history', 'easy', 'The Roman Empire was centred in Rome, Italy.', 'True'),
   _mcq('h_e_009', 'history', 'easy', 'Who invented the telephone?', ['Thomas Edison', 'Nikola Tesla', 'Alexander Graham Bell', 'Benjamin Franklin'], 'Alexander Graham Bell'),
-  _fill('h_e_010', 'history', 'easy', 'The Berlin Wall fell in ___9.', '198'),
+  _fill('h_e_010', 'history', 'easy', 'In what year did the Berlin Wall fall?', '1989'),
 
   // ─── HISTORY – MEDIUM ──────────────────────────────────────────────────────
   _mcq('h_m_001', 'history', 'medium', 'What did the Magna Carta establish?', ['End of feudalism', 'Limits on royal power', 'Universal voting rights', 'Free trade'], 'Limits on royal power'),

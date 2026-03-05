@@ -55,7 +55,10 @@ class ProgressRepository {
 
       ProgressModel next = current;
       if (attempt.isCorrect) {
-        next = current.applyCorrectAnswer();
+        // Pass the attempt's own timestamp so that the streak/daily-count
+        // logic is consistent with the recorded createdAt, even if the
+        // Firestore transaction runs slightly later.
+        next = current.applyCorrectAnswer(now: attempt.createdAt);
       }
 
       // Update adaptive difficulty

@@ -16,6 +16,16 @@ class CosmeticsShopScreen extends ConsumerStatefulWidget {
 }
 
 class _CosmeticsShopScreenState extends ConsumerState<CosmeticsShopScreen> {
+  // TODO (post-MVP): Replace in-memory ownership set with Firestore-backed
+  // persistence.  Suggested schema:
+  //   children/{childId}/ownedCosmetics/{itemId}  { purchasedAt: timestamp }
+  // Steps:
+  //   1. Add `ownedCosmeticsCol` to ProgressRepository (or a new CosmeticsRepository).
+  //   2. On purchase, run a Firestore transaction that:
+  //        a. Deducts coins from children/{childId}/progress/current.
+  //        b. Writes the item doc to ownedCosmetics/.
+  //   3. Load owned items via a StreamProvider so the UI reacts reactively.
+  //   4. Without this, purchased items are lost on app restart.
   Set<String> _owned = {};
 
   @override

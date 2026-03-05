@@ -8,6 +8,9 @@ class ChildModel extends Equatable {
   final int age;
   final String grade;
   final String pinHash;
+  /// Per-child randomly generated salt used by [PinService.hashPin].
+  /// Generated once at child creation and stored alongside [pinHash].
+  final String pinSalt;
   final String avatarId;
   final DateTime createdAt;
   final List<String> subjectsEnabled;
@@ -22,6 +25,7 @@ class ChildModel extends Equatable {
     required this.age,
     required this.grade,
     required this.pinHash,
+    required this.pinSalt,
     required this.avatarId,
     required this.createdAt,
     this.subjectsEnabled = const ['math', 'science', 'english'],
@@ -38,6 +42,7 @@ class ChildModel extends Equatable {
       age: map['age'] as int? ?? 0,
       grade: map['grade'] as String? ?? '',
       pinHash: map['pinHash'] as String? ?? '',
+      pinSalt: map['pinSalt'] as String? ?? '',
       avatarId: map['avatarId'] as String? ?? 'avatar_1',
       createdAt: map['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int)
@@ -57,6 +62,7 @@ class ChildModel extends Equatable {
       'age': age,
       'grade': grade,
       'pinHash': pinHash,
+      'pinSalt': pinSalt,
       'avatarId': avatarId,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'subjectsEnabled': subjectsEnabled,
@@ -73,6 +79,7 @@ class ChildModel extends Equatable {
     int? age,
     String? grade,
     String? pinHash,
+    String? pinSalt,
     String? avatarId,
     DateTime? createdAt,
     List<String>? subjectsEnabled,
@@ -87,6 +94,7 @@ class ChildModel extends Equatable {
       age: age ?? this.age,
       grade: grade ?? this.grade,
       pinHash: pinHash ?? this.pinHash,
+      pinSalt: pinSalt ?? this.pinSalt,
       avatarId: avatarId ?? this.avatarId,
       createdAt: createdAt ?? this.createdAt,
       subjectsEnabled: subjectsEnabled ?? this.subjectsEnabled,
@@ -104,6 +112,7 @@ class ChildModel extends Equatable {
         age,
         grade,
         pinHash,
+        pinSalt,
         avatarId,
         createdAt,
         subjectsEnabled,

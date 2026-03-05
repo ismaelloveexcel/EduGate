@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/repositories/auth_repository.dart';
 import '../../../shared/repositories/children_repository.dart';
-import '../../../shared/services/pin_service.dart';
 
 class AddEditChildScreen extends ConsumerStatefulWidget {
   final String? childId;
@@ -58,7 +57,7 @@ class _AddEditChildScreenState extends ConsumerState<AddEditChildScreen> {
           name: _nameCtrl.text.trim(),
           age: int.parse(_ageCtrl.text.trim()),
           grade: _gradeCtrl.text.trim(),
-          pinHash: PinService.hashPin(pin),
+          rawPin: pin,
           avatarId: _avatarId,
         );
       }

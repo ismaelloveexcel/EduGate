@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/child_model.dart';
+import '../services/pin_service.dart';
 
 final childrenRepositoryProvider = Provider<ChildrenRepository>((ref) {
   return ChildrenRepository(firestore: FirebaseFirestore.instance);
@@ -33,17 +34,24 @@ class ChildrenRepository {
         );
   }
 
+  /// Creates a new child profile.
+  ///
+  /// [rawPin] is the plaintext PIN entered by the parent.
+  /// A fresh random salt is generated here; the PIN is hashed before storage.
   Future<ChildModel> addChild({
     required String parentId,
     required String name,
     required int age,
     required String grade,
-    required String pinHash,
+    required String rawPin,
     required String avatarId,
     List<String> subjectsEnabled = const ['math', 'science', 'english'],
     int quizIntervalMinutes = 30,
   }) async {
     final id = _uuid.v4();
+    final salt = PinService.generateSalt();
+    final pinHash = PinService.hashPin(rawPin, salt: salt);
+
     final child = ChildModel(
       id: id,
       parentId: parentId,
@@ -51,6 +59,7 @@ class ChildrenRepository {
       age: age,
       grade: grade,
       pinHash: pinHash,
+      pinSalt: salt,
       avatarId: avatarId,
       createdAt: DateTime.now(),
       subjectsEnabled: subjectsEnabled,
@@ -59,7 +68,7 @@ class ChildrenRepository {
 
     final batch = _firestore.batch();
     batch.set(_childrenCol(parentId).doc(id), child.toMap());
-    // Also store a top-level mapping for security rule lookups
+    // Top-level mapping used by security rules for ownership verification.
     batch.set(
       _firestore.collection('childParentMap').doc(id),
       {'parentId': parentId},

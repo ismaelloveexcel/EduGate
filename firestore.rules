@@ -34,12 +34,22 @@ service cloud.firestore {
     }
 
     // ─── childParentMap/{childId} ───────────────────────────────────────────
-    // Written only when a child is created (via batch write from client or Cloud Functions).
     // Readable by authenticated users to support ownership lookups.
-    // TODO: In production, restrict writes to Cloud Functions only.
+    //
+    // ⚠️  SECURITY WARNING: This collection must only be written by the
+    // Firebase Admin SDK (Cloud Functions) to prevent a user from falsely
+    // claiming ownership of another child's data.
+    //
+    // The current rule (`isAuthenticated()`) is acceptable for development
+    // and early MVP only.  Before going to production:
+    //   1. Remove the `allow write` rule below.
+    //   2. All childParentMap writes must go through a Cloud Function that
+    //      verifies the caller owns the parent document before writing.
+    //   3. See functions/src/index.ts `onChildCreated` for the trigger that
+    //      should be extended to handle this.
     match /childParentMap/{childId} {
       allow read: if isAuthenticated();
-      // TODO: Restrict write to admin SDK / Cloud Functions only.
+      // TODO (pre-production): Restrict to Admin SDK / Cloud Functions only.
       allow write: if isAuthenticated();
     }
 

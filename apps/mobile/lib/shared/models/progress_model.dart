@@ -76,6 +76,10 @@ class ProgressModel extends Equatable {
       lastMinMetDate: map['lastMinMetDate'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['lastMinMetDate'] as int)
           : (map['lastActiveDate'] != null
+              // TODO: Remove this fallback once all Firestore documents have
+              // been migrated from the old 'lastActiveDate' field name to
+              // 'lastMinMetDate'.  Migration should be done via a one-off
+              // Cloud Function that backfills the new field.
               ? DateTime.fromMillisecondsSinceEpoch(
                   map['lastActiveDate'] as int)
               : null),

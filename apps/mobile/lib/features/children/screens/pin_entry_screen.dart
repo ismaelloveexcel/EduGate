@@ -46,7 +46,7 @@ class _PinEntryScreenState extends ConsumerState<PinEntryScreen> {
         orElse: () => throw Exception('Child not found'),
       );
 
-      if (PinService.verifyPin(_pin, child.pinHash)) {
+      if (PinService.verifyPin(_pin, child.pinHash, salt: child.pinSalt)) {
         if (mounted) context.go('/child-home/${widget.childId}');
       } else {
         setState(() {
