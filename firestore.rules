@@ -1,0 +1,71 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ───────────────────────────────────────────────────
+
+    /// Returns true if the request comes from an authenticated user.
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /// Returns true if the authenticated user is the given parent.
+    function isParent(parentId) {
+      return isAuthenticated() && request.auth.uid == parentId;
+    }
+
+    // TODO: Implement a more robust ownership check using Firestore gets.
+    // Currently trusting the parentId stored in the child document.
+    // In production, use: get(/databases/$(database)/documents/childParentMap/$(childId)).data.parentId == request.auth.uid
+    function isParentOfChild(childId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/childParentMap/$(childId)).data.parentId == request.auth.uid;
+    }
+
+    // ─── parents/{parentId} ─────────────────────────────────────────────────
+    match /parents/{parentId} {
+      allow read, write: if isParent(parentId);
+
+      // ─── parents/{parentId}/children/{childId} ──────────────────────────
+      match /children/{childId} {
+        allow read, write: if isParent(parentId);
+      }
+    }
+
+    // ─── childParentMap/{childId} ───────────────────────────────────────────
+    // Written only when a child is created (via batch write from client or Cloud Functions).
+    // Readable by authenticated users to support ownership lookups.
+    // TODO: In production, restrict writes to Cloud Functions only.
+    match /childParentMap/{childId} {
+      allow read: if isAuthenticated();
+      // TODO: Restrict write to admin SDK / Cloud Functions only.
+      allow write: if isAuthenticated();
+    }
+
+    // ─── children/{childId}/progress/{progressId} ───────────────────────────
+    // TODO: Verify ownership via childParentMap lookup.
+    match /children/{childId}/progress/{progressId} {
+      allow read, write: if isParentOfChild(childId);
+    }
+
+    // ─── children/{childId}/attempts/{attemptId} ────────────────────────────
+    // TODO: Verify ownership via childParentMap lookup.
+    match /children/{childId}/attempts/{attemptId} {
+      allow read, write: if isParentOfChild(childId);
+    }
+
+    // ─── questions/{questionId} ─────────────────────────────────────────────
+    // Questions are read-only for all authenticated users.
+    // Writing is restricted to admin SDK / Cloud Functions.
+    match /questions/{questionId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only admin SDK / Cloud Functions
+    }
+
+    // ─── Deny all other access ──────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
