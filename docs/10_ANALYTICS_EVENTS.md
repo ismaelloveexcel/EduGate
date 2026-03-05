@@ -1,0 +1,10 @@
+# Analytics Events
+
+quiz_started
+quiz_answered
+quiz_completed
+streak_updated
+level_up
+reward_unlocked
+child_profile_created
+parent_login
