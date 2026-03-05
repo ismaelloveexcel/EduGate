@@ -21,12 +21,11 @@ To connect the Flutter app to Firebase:
 4. **Add FlutterFire packages** to `apps/mobile/pubspec.yaml`:
    ```yaml
    dependencies:
-     firebase_core: ^2.x.x
-     firebase_auth: ^4.x.x
-     cloud_firestore: ^4.x.x
-     firebase_messaging: ^14.x.x
-     firebase_crashlytics: ^3.x.x
-     firebase_remote_config: ^4.x.x
+     firebase_core: ^3.8.0
+     firebase_auth: ^5.3.1
+     cloud_firestore: ^5.5.0
+     firebase_messaging: ^15.1.2
+     firebase_crashlytics: ^4.1.3
    ```
    Then run `flutter pub get`.
 

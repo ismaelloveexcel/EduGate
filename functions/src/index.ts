@@ -28,18 +28,21 @@ const db = admin.firestore();
 // ─── New Child Created ───────────────────────────────────────────────────────
 /**
  * When a child is created under parents/{parentId}/children/{childId},
- * initialise their progress document in children/{childId}/progress/current.
+ * initialise their progress document at
+ * parents/{parentId}/children/{childId}/progress/main.
  */
 export const onChildCreated = functions.firestore
   .document("parents/{parentId}/children/{childId}")
   .onCreate(async (snap, context) => {
-    const { childId } = context.params;
+    const { parentId, childId } = context.params;
 
     const progressRef = db
+      .collection("parents")
+      .doc(parentId)
       .collection("children")
       .doc(childId)
       .collection("progress")
-      .doc("current");
+      .doc("main");
 
     await progressRef.set({
       xp: 0,

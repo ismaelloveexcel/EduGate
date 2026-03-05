@@ -4,6 +4,20 @@
 
 ---
 
+## Data Model: Parent-Subtree Layout
+
+All child data lives under the parent document — ownership is enforced via the path prefix, with no cross-collection lookups needed:
+
+```
+parents/{parentId}
+parents/{parentId}/children/{childId}
+parents/{parentId}/children/{childId}/progress/main
+parents/{parentId}/children/{childId}/attempts/{attemptId}
+questions/{questionId}   # read-only to authenticated users
+```
+
+---
+
 ## Collection: `parents/{parentId}`
 
 | Field | Type | Description |
@@ -12,7 +26,7 @@
 | `displayName` | string | Parent's display name |
 | `createdAt` | int (ms) | Account creation timestamp |
 | `childIds` | string[] | List of child IDs under this parent |
-| `fcmToken` | string? | FCM device token for push notifications |
+| `fcmTokens` | string[] | FCM device tokens for push notifications (supports multiple devices) |
 
 **Security:** Readable/writable only by the authenticated parent (`request.auth.uid == parentId`).
 
@@ -22,11 +36,12 @@
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `parentId` | string | Parent's UID (denormalised for security rules) |
+| `parentId` | string | Parent's UID (denormalised for convenience) |
 | `name` | string | Child's display name |
 | `age` | int | Child's age |
 | `grade` | string | e.g. "Grade 3", "Year 5" |
-| `pinHash` | string | SHA-256 hash of 4–6 digit PIN |
+| `pinHash` | string | SHA-256 hash of 4–6 digit PIN (with per-child salt) |
+| `pinSalt` | string | Random hex salt unique to this child |
 | `avatarId` | string | Avatar identifier |
 | `createdAt` | int (ms) | Profile creation timestamp |
 | `subjectsEnabled` | string[] | Active subjects for quiz selection |
@@ -36,17 +51,7 @@
 
 ---
 
-## Collection: `childParentMap/{childId}`
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `parentId` | string | Parent UID who owns this child |
-
-Used by security rules to verify parent ownership when accessing child sub-collections.
-
----
-
-## Sub-collection: `children/{childId}/progress/current`
+## Sub-collection: `parents/{parentId}/children/{childId}/progress/main`
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -62,7 +67,7 @@ Used by security rules to verify parent ownership when accessing child sub-colle
 
 ---
 
-## Sub-collection: `children/{childId}/attempts/{attemptId}`
+## Sub-collection: `parents/{parentId}/children/{childId}/attempts/{attemptId}`
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -99,14 +104,15 @@ Used by security rules to verify parent ownership when accessing child sub-colle
 
 ## Security Rules Summary
 
+Ownership is determined entirely by the Firestore path — no secondary lookups needed:
+
 ```
-// See firestore.rules for full rules draft
-parents/{parentId}           → parent read/write own doc only
-parents/{parentId}/children  → parent read/write own children
-children/{childId}/progress  → parent who owns childId (via childParentMap lookup)
-children/{childId}/attempts  → parent who owns childId (via childParentMap lookup)
-questions                    → authenticated read, no write
-childParentMap               → server-only write, authenticated read
+parents/{parentId}                               → isOwner(parentId) read/write
+parents/{parentId}/children/{childId}            → isOwner(parentId) read/write
+parents/{parentId}/children/{childId}/progress/* → isOwner(parentId) read/write
+parents/{parentId}/children/{childId}/attempts/* → isOwner(parentId) create/read; immutable once written
+questions                                        → authenticated read; Admin SDK write only
 ```
 
-**TODO:** Implement Firestore rules function `isParentOfChild(childId)` that queries `childParentMap/{childId}.parentId == request.auth.uid`.
+See `functions/firestore.rules` for the full rules file.
+

@@ -7,7 +7,8 @@ class ParentModel extends Equatable {
   final String displayName;
   final DateTime createdAt;
   final List<String> childIds;
-  final String? fcmToken;
+  /// Device FCM tokens — supports multiple devices per parent.
+  final List<String> fcmTokens;
 
   const ParentModel({
     required this.id,
@@ -15,7 +16,7 @@ class ParentModel extends Equatable {
     required this.displayName,
     required this.createdAt,
     this.childIds = const [],
-    this.fcmToken,
+    this.fcmTokens = const [],
   });
 
   factory ParentModel.fromMap(Map<String, dynamic> map, String id) {
@@ -29,7 +30,7 @@ class ParentModel extends Equatable {
             )
           : DateTime.now(),
       childIds: List<String>.from(map['childIds'] as List? ?? []),
-      fcmToken: map['fcmToken'] as String?,
+      fcmTokens: List<String>.from(map['fcmTokens'] as List? ?? []),
     );
   }
 
@@ -39,7 +40,7 @@ class ParentModel extends Equatable {
       'displayName': displayName,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'childIds': childIds,
-      'fcmToken': fcmToken,
+      'fcmTokens': fcmTokens,
     };
   }
 
@@ -49,7 +50,7 @@ class ParentModel extends Equatable {
     String? displayName,
     DateTime? createdAt,
     List<String>? childIds,
-    String? fcmToken,
+    List<String>? fcmTokens,
   }) {
     return ParentModel(
       id: id ?? this.id,
@@ -57,11 +58,11 @@ class ParentModel extends Equatable {
       displayName: displayName ?? this.displayName,
       createdAt: createdAt ?? this.createdAt,
       childIds: childIds ?? this.childIds,
-      fcmToken: fcmToken ?? this.fcmToken,
+      fcmTokens: fcmTokens ?? this.fcmTokens,
     );
   }
 
   @override
   List<Object?> get props =>
-      [id, email, displayName, createdAt, childIds, fcmToken];
+      [id, email, displayName, createdAt, childIds, fcmTokens];
 }
