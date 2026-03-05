@@ -50,33 +50,43 @@ See [`functions/README.md`](functions/README.md) for Firebase Functions setup.
 
 ### Labels
 
+**Type**
+
 | Label | Description |
 |-------|-------------|
 | `epic` | Epic / planning container |
-| `mvp` | Required for MVP |
-| `phase-2` | Post-MVP scope |
-| `blocked` | Blocked on something |
-| `needs-review` | Awaiting review |
 | `feature` | New feature work |
 | `bug` | Bug fix |
-| `tech-debt` | Refactor / clean-up |
 | `docs` | Documentation |
+| `tech-debt` | Refactor / clean-up |
 | `security` | Security-related |
-| `analytics` | Analytics / telemetry |
 | `content` | Content (questions, copy) |
-| `design` | Design / UI |
-| `P0` | Critical priority |
+| `analytics` | Analytics / telemetry |
+| `ui` | UI / design |
+
+**Priority**
+
+| Label | Description |
+|-------|-------------|
+| `P0` | Critical — blocks launch |
 | `P1` | High priority |
 | `P2` | Medium priority |
+
+**Phase**
+
+| Label | Description |
+|-------|-------------|
+| `mvp` | Required for MVP |
+| `phase-2` | Post-MVP scope |
 
 ### Milestones
 
 | Milestone | Scope |
 |-----------|-------|
-| M0 | Repo + CI Baseline |
-| M1 | Auth + Family Accounts |
+| M0 | Repo & CI Baseline |
+| M1 | Parent Auth + Child Profiles |
 | M2 | Quiz Engine v1 |
-| M3 | Triggers + Notifications |
-| M4 | Progress + Rewards |
-| M5 | Parent Dashboard v1 |
+| M3 | Progress + Rewards |
+| M4 | Notifications |
+| M5 | Parent Dashboard |
 | M6 | Beta Hardening |

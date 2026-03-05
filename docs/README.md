@@ -48,9 +48,22 @@ To connect the Flutter app to Firebase:
    - Use **Firebase Remote Config** to manage runtime values (quiz intervals, reward amounts, etc.) without app releases.
    - Use **Firebase App Check** to protect backend resources in production.
 
+## Firestore Data Structure (MVP-locked)
+
+All child data lives under the authenticated parent's document. This makes access control simple: only the authenticated parent can read or write their own subtree.
+
+```
+parents/{parentId}                                # Parent profile doc
+parents/{parentId}/children/{childId}             # Child profile doc
+parents/{parentId}/children/{childId}/progress/main  # Progress + stats
+parents/{parentId}/children/{childId}/attempts/{attemptId}  # Quiz attempts
+
+questions/{questionId}                            # Question bank (read-only to authenticated users)
+```
+
 ## Firestore Security Rules
 
-See `functions/firestore.rules` for the security rules that enforce family data isolation (a parent can only access their own family documents and child sub-collections).
+See [`functions/firestore.rules`](../functions/firestore.rules) for the security rules that enforce family data isolation (a parent can only access their own family documents and child sub-collections).
 
 ## Architecture Overview
 

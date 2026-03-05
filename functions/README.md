@@ -33,4 +33,21 @@ This directory will contain Firebase Cloud Functions (Node.js / TypeScript) for 
 
 ## Firestore Security Rules
 
-`firestore.rules` (to be added) will enforce that each parent can only read/write their own family's Firestore documents. Unauthorised access will be blocked at the database level.
+[`firestore.rules`](firestore.rules) enforces that each parent can only read/write their own family's Firestore documents. Unauthorised access is blocked at the database level.
+
+To deploy the rules:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+### Data structure enforced by these rules
+
+```
+parents/{parentId}
+parents/{parentId}/children/{childId}
+parents/{parentId}/children/{childId}/progress/main
+parents/{parentId}/children/{childId}/attempts/{attemptId}
+
+questions/{questionId}   # read-only to authenticated users; written via Admin SDK only
+```
