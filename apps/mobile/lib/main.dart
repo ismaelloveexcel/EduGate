@@ -1,4 +1,6 @@
 // lib/main.dart
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -26,16 +28,29 @@ Future<void> main() async {
   runApp(const ProviderScope(child: EduGateApp()));
 }
 
-class EduGateApp extends ConsumerWidget {
+class EduGateApp extends ConsumerStatefulWidget {
   const EduGateApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(appRouterProvider);
+  ConsumerState<EduGateApp> createState() => _EduGateAppState();
+}
 
-    // Initialise the FCM-based NotificationService once the router is ready.
-    // registerToken(parentId:) is called from the auth flow after sign-in.
-    ref.read(notificationServiceProvider).init(router: router);
+class _EduGateAppState extends ConsumerState<EduGateApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialise the FCM-based NotificationService once when the app widget is
+    // created. registerToken(parentId:) is called from the auth flow after sign-in.
+    unawaited(
+      ref
+          .read(notificationServiceProvider)
+          .init(router: ref.read(appRouterProvider)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
       title: 'EduGate',

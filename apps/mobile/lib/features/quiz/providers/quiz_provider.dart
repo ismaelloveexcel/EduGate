@@ -22,6 +22,11 @@ class QuizState {
   final bool loading;
   final String? error;
 
+  // Cached data from initialize — reused across all submitAnswer calls.
+  final ChildModel? child;
+  final String? parentId;
+  final List<AttemptModel> recentAttempts;
+
   const QuizState({
     this.questions = const [],
     this.currentIndex = 0,
@@ -30,6 +35,9 @@ class QuizState {
     this.updatedProgress,
     this.loading = false,
     this.error,
+    this.child,
+    this.parentId,
+    this.recentAttempts = const [],
   });
 
   QuizState copyWith({
@@ -40,6 +48,9 @@ class QuizState {
     ProgressModel? updatedProgress,
     bool? loading,
     String? error,
+    ChildModel? child,
+    String? parentId,
+    List<AttemptModel>? recentAttempts,
   }) {
     return QuizState(
       questions: questions ?? this.questions,
@@ -49,6 +60,9 @@ class QuizState {
       updatedProgress: updatedProgress ?? this.updatedProgress,
       loading: loading ?? this.loading,
       error: error ?? this.error,
+      child: child ?? this.child,
+      parentId: parentId ?? this.parentId,
+      recentAttempts: recentAttempts ?? this.recentAttempts,
     );
   }
 
@@ -81,7 +95,7 @@ class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
       final progress =
           await ref.read(progressRepositoryProvider).getProgress(user.uid, childId);
 
-      // Get recent attempts for adaptive difficulty
+      // Get recent attempts for adaptive difficulty (cached for the session)
       final recentAttempts = await ref
           .read(progressRepositoryProvider)
           .getRecentAttempts(user.uid, childId, limit: 60);
@@ -107,7 +121,12 @@ class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
         return;
       }
 
-      state = AsyncData(QuizState(questions: selected));
+      state = AsyncData(QuizState(
+        questions: selected,
+        child: child,
+        parentId: user.uid,
+        recentAttempts: recentAttempts,
+      ));
     } catch (e, st) {
       state = AsyncError(e, st);
     }
@@ -120,6 +139,11 @@ class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
   }) async {
     final current = state.valueOrNull;
     if (current == null) return;
+
+    // Use cached child and parentId — no extra Firestore reads per answer.
+    final child = current.child;
+    final parentId = current.parentId;
+    if (child == null || parentId == null) return;
 
     final isCorrect =
         userAnswer.trim().toLowerCase() ==
@@ -137,22 +161,15 @@ class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
       createdAt: DateTime.now(),
     );
 
-    final user = ref.read(authStateProvider).valueOrNull;
-    if (user == null) return;
-
-    final children =
-        await ref.read(childrenRepositoryProvider).getChildren(user.uid);
-    final child = children.firstWhere((c) => c.id == _childId);
-
-    final recentAttempts = await ref
-        .read(progressRepositoryProvider)
-        .getRecentAttempts(user.uid, _childId, limit: 20);
+    // Prepend the new attempt to the cached list so difficulty logic stays
+    // current without any additional Firestore reads.
+    final updatedRecentAttempts = [attempt, ...current.recentAttempts];
 
     final updatedProgress =
         await ref.read(progressRepositoryProvider).recordAttempt(
-              parentId: user.uid,
+              parentId: parentId,
               attempt: attempt,
-              recentAttempts: recentAttempts,
+              recentAttempts: updatedRecentAttempts,
               subjectsEnabled: child.subjectsEnabled,
             );
 
@@ -167,6 +184,7 @@ class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
       answers: newAnswers,
       isComplete: isComplete,
       updatedProgress: updatedProgress,
+      recentAttempts: updatedRecentAttempts,
     ));
   }
 }

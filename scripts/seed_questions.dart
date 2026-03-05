@@ -1,22 +1,19 @@
 /// EduGate Question Seed Script
 ///
-/// This script seeds approximately 200 questions into the Firestore
-/// `questions` collection for development and testing.
+/// Prints approximately 200 questions as JSON to stdout for manual import
+/// into the Firestore `questions` collection.
 ///
 /// USAGE:
-///   dart run scripts/seed_questions.dart
+///   dart run scripts/seed_questions.dart > questions.json
 ///
-/// PREREQUISITES:
-///   1. Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to your
-///      Firebase service account key JSON file path.
-///      export GOOGLE_APPLICATION_CREDENTIALS="/path/to/serviceAccountKey.json"
-///   2. Run: dart pub get (from apps/mobile or project root)
+/// IMPORT OPTIONS:
+///   1. Firebase Console → Firestore → Import JSON (paste the output).
+///   2. Firestore emulator: import the printed JSON via the emulator UI.
+///   3. Admin SDK / REST: pipe the output into a script that calls
+///      Firestore's batch-write endpoint.
 ///
-/// NOTE: This script requires the `http` package or Firebase Admin Dart SDK.
-/// For simplicity in MVP, you can also seed via the Firebase Console using
-/// the JSON below, or via the Firestore emulator.
-///
-/// TODO: Wire this up with firebase_admin or direct REST API calls.
+/// TODO: Wire this up with the Firebase Admin Dart SDK or a direct REST
+///   call to write documents automatically instead of printing JSON.
 
 // ignore_for_file: avoid_print
 

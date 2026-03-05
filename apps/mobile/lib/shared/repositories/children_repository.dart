@@ -66,9 +66,7 @@ class ChildrenRepository {
       quizIntervalMinutes: quizIntervalMinutes,
     );
 
-    final batch = _firestore.batch();
-    batch.set(_childrenCol(parentId).doc(id), child.toMap());
-    await batch.commit();
+    await _childrenCol(parentId).doc(id).set(child.toMap());
 
     return child;
   }

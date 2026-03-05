@@ -18,6 +18,16 @@ final _childProvider =
       orElse: () => throw Exception('Child not found'));
 });
 
+/// Top-level provider so Riverpod can cache and share the stream subscription.
+typedef _ProgressKey = ({String parentId, String childId});
+
+final _progressStreamProvider =
+    StreamProvider.family<ProgressModel, _ProgressKey>((ref, key) {
+  return ref
+      .read(progressRepositoryProvider)
+      .watchProgress(key.parentId, key.childId);
+});
+
 class ChildHomeScreen extends ConsumerWidget {
   final String childId;
   const ChildHomeScreen({super.key, required this.childId});
@@ -29,11 +39,7 @@ class ChildHomeScreen extends ConsumerWidget {
     final progressAsync = user == null
         ? const AsyncValue<ProgressModel>.loading()
         : ref.watch(
-            StreamProvider.family<ProgressModel, ({String parentId, String childId})>(
-              (ref, key) => ref
-                  .watch(progressRepositoryProvider)
-                  .watchProgress(key.parentId, key.childId),
-            )((parentId: user.uid, childId: childId)),
+            _progressStreamProvider((parentId: user.uid, childId: childId)),
           );
 
     return Scaffold(

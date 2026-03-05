@@ -7,6 +7,16 @@ import '../../../shared/repositories/auth_repository.dart';
 import '../../../shared/repositories/progress_repository.dart';
 import '../../../shared/models/progress_model.dart';
 
+/// Top-level provider so Riverpod can cache and share the stream subscription.
+typedef _ShopProgressKey = ({String parentId, String childId});
+
+final _shopProgressStreamProvider =
+    StreamProvider.family<ProgressModel, _ShopProgressKey>((ref, key) {
+  return ref
+      .read(progressRepositoryProvider)
+      .watchProgress(key.parentId, key.childId);
+});
+
 class CosmeticsShopScreen extends ConsumerStatefulWidget {
   final String childId;
   const CosmeticsShopScreen({super.key, required this.childId});
@@ -35,11 +45,8 @@ class _CosmeticsShopScreenState extends ConsumerState<CosmeticsShopScreen> {
     final progressAsync = user == null
         ? const AsyncValue<ProgressModel>.loading()
         : ref.watch(
-            StreamProvider.family<ProgressModel, ({String parentId, String childId})>(
-              (ref, key) => ref
-                  .read(progressRepositoryProvider)
-                  .watchProgress(key.parentId, key.childId),
-            )((parentId: user.uid, childId: widget.childId)),
+            _shopProgressStreamProvider(
+                (parentId: user.uid, childId: widget.childId)),
           );
 
     return Scaffold(

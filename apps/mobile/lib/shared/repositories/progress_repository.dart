@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/attempt_model.dart';
 import '../models/progress_model.dart';
+import '../services/quiz_engine.dart';
 
 final progressRepositoryProvider = Provider<ProgressRepository>((ref) {
   return ProgressRepository(firestore: FirebaseFirestore.instance);
@@ -79,8 +80,7 @@ class ProgressRepository {
       }
 
       // Update adaptive difficulty
-      final updatedDifficulties =
-          QuizEngineHelper.computeUpdatedDifficulties(
+      final updatedDifficulties = QuizEngine.computeUpdatedDifficulties(
         recentAttempts: [...recentAttempts, attempt],
         progress: next,
         subjects: subjectsEnabled,
@@ -128,24 +128,3 @@ class ProgressRepository {
   }
 }
 
-/// Helper to avoid circular import with quiz_engine.dart
-class QuizEngineHelper {
-  static Map<String, String> computeUpdatedDifficulties({
-    required List<AttemptModel> recentAttempts,
-    required ProgressModel progress,
-    required List<String> subjects,
-  }) {
-    final updated = Map<String, String>.from(progress.difficultyBySubject);
-    for (final subject in subjects) {
-      final subjectAttempts =
-          recentAttempts.where((a) => a.subject == subject).take(20).toList();
-      if (subjectAttempts.isEmpty) continue;
-      final accuracy =
-          subjectAttempts.where((a) => a.isCorrect).length /
-              subjectAttempts.length;
-      final newDiff = progress.adaptiveDifficulty(subject, accuracy);
-      updated[subject] = newDiff.name;
-    }
-    return updated;
-  }
-}

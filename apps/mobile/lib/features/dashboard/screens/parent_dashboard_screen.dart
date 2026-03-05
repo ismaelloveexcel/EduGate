@@ -10,6 +10,16 @@ import '../../../shared/models/child_model.dart';
 import '../../../shared/models/attempt_model.dart';
 import '../../../shared/models/progress_model.dart';
 
+/// Top-level provider so Riverpod can cache and share the stream subscription.
+typedef _DashProgressKey = ({String parentId, String childId});
+
+final _dashProgressStreamProvider =
+    StreamProvider.family<ProgressModel, _DashProgressKey>((ref, key) {
+  return ref
+      .read(progressRepositoryProvider)
+      .watchProgress(key.parentId, key.childId);
+});
+
 class ParentDashboardScreen extends ConsumerWidget {
   const ParentDashboardScreen({super.key});
 
@@ -56,11 +66,8 @@ class _ChildDashboardCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progressAsync = ref.watch(
-      StreamProvider.family<ProgressModel, ({String parentId, String childId})>(
-        (ref, key) => ref
-            .read(progressRepositoryProvider)
-            .watchProgress(key.parentId, key.childId),
-      )((parentId: child.parentId, childId: child.id)),
+      _dashProgressStreamProvider(
+          (parentId: child.parentId, childId: child.id)),
     );
 
     return Card(

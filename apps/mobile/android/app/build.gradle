@@ -55,6 +55,9 @@ android {
 
     buildTypes {
         release {
+            // TODO (pre-production): Replace with a release signing config using a
+            // dedicated production keystore before distributing via the Play Store.
+            // See https://docs.flutter.dev/deployment/android#signing-the-app
             signingConfig signingConfigs.debug
         }
     }
