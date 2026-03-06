@@ -10,7 +10,7 @@ import '../../../shared/models/progress_model.dart';
 
 final _childProvider =
     FutureProvider.family<ChildModel?, String>((ref, childId) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
+  final user = ref.watch(authStateProvider).value;
   if (user == null) return null;
   final children =
       await ref.read(childrenRepositoryProvider).getChildren(user.uid);
@@ -34,7 +34,7 @@ class ChildHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authStateProvider).valueOrNull;
+    final user = ref.watch(authStateProvider).value;
     final childAsync = ref.watch(_childProvider(childId));
     final progressAsync = user == null
         ? const AsyncValue<ProgressModel>.loading()

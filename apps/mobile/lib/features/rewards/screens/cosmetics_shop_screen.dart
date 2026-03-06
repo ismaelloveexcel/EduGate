@@ -41,7 +41,7 @@ class _CosmeticsShopScreenState extends ConsumerState<CosmeticsShopScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authStateProvider).valueOrNull;
+    final user = ref.watch(authStateProvider).value;
     final progressAsync = user == null
         ? const AsyncValue<ProgressModel>.loading()
         : ref.watch(
