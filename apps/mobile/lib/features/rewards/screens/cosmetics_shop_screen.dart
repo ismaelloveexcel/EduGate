@@ -3,15 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/models/cosmetic_item_model.dart';
+import '../../../shared/models/progress_key.dart';
 import '../../../shared/repositories/auth_repository.dart';
 import '../../../shared/repositories/progress_repository.dart';
 import '../../../shared/models/progress_model.dart';
 
-/// Top-level provider so Riverpod can cache and share the stream subscription.
-typedef _ShopProgressKey = ({String parentId, String childId});
-
 final _shopProgressStreamProvider =
-    StreamProvider.family<ProgressModel, _ShopProgressKey>((ref, key) {
+    StreamProvider.family<ProgressModel, ProgressKey>((ref, key) {
   return ref
       .read(progressRepositoryProvider)
       .watchProgress(key.parentId, key.childId);

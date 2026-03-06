@@ -71,13 +71,12 @@ class ProgressRepository {
           ? ProgressModel.fromMap(progressSnap.data()!, attempt.childId)
           : ProgressModel(childId: attempt.childId);
 
-      ProgressModel next = current;
-      if (attempt.isCorrect) {
-        // Pass the attempt's own timestamp so that the streak/daily-count
-        // logic is consistent with the recorded createdAt, even if the
-        // Firestore transaction runs slightly later.
-        next = current.applyCorrectAnswer(now: attempt.createdAt);
-      }
+      // applyAttempt always increments daily count and manages streaks;
+      // XP/coins are only awarded when isCorrect is true.
+      ProgressModel next = current.applyAttempt(
+        isCorrect: attempt.isCorrect,
+        now: attempt.createdAt,
+      );
 
       // Update adaptive difficulty
       final updatedDifficulties = QuizEngine.computeUpdatedDifficulties(
