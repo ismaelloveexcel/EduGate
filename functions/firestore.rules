@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(parentId) {
+      return isSignedIn() && request.auth.uid == parentId;
+    }
+
+    // --------------------------------------------------------
+    // parents/{parentId}
+    // --------------------------------------------------------
+    match /parents/{parentId} {
+      allow read:   if isOwner(parentId);
+      allow create: if isOwner(parentId);
+      allow update: if isOwner(parentId);
+      allow delete: if false; // prefer deactivation over deletion
+
+      // --------------------------------------------------------
+      // parents/{parentId}/children/{childId}
+      // --------------------------------------------------------
+      match /children/{childId} {
+        allow read:   if isOwner(parentId);
+        allow create: if isOwner(parentId);
+        allow update: if isOwner(parentId);
+        allow delete: if false; // prefer "archived" field instead
+
+        // --------------------------------------------------------
+        // parents/{parentId}/children/{childId}/progress/main
+        // --------------------------------------------------------
+        match /progress/{docId} {
+          allow read:   if isOwner(parentId);
+          allow create: if isOwner(parentId);
+          allow update: if isOwner(parentId);
+          allow delete: if false;
+        }
+
+        // --------------------------------------------------------
+        // parents/{parentId}/children/{childId}/attempts/{attemptId}
+        // --------------------------------------------------------
+        match /attempts/{attemptId} {
+          allow read:   if isOwner(parentId);
+          allow create: if isOwner(parentId);
+          allow update: if false; // attempts are immutable once written
+          allow delete: if false;
+        }
+      }
+    }
+
+    // --------------------------------------------------------
+    // questions/{questionId}
+    // Read-only to any authenticated user; writes via Admin SDK only.
+    // --------------------------------------------------------
+    match /questions/{questionId} {
+      allow read:  if isSignedIn();
+      allow write: if false;
+    }
+  }
+}
