@@ -8,6 +8,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../shared/models/child_model.dart';
+
 /// Top-level handler for background/terminated FCM messages.
 /// Must be a top-level function (not a class method).
 @pragma('vm:entry-point')
@@ -225,6 +227,82 @@ class NotificationService {
     if (route != null && route.isNotEmpty && _router != null) {
       _router!.go(route);
     }
+  }
+
+  // -------------------------------------------------------
+  // Quiz reminder scheduling
+  // -------------------------------------------------------
+
+  /// Schedules a local quiz reminder for [child] after their configured interval.
+  /// Respects quiet hours by adjusting the trigger time forward if needed.
+  Future<void> scheduleNextQuiz(ChildModel child) async {
+    var triggerTime = DateTime.now().add(
+      Duration(minutes: child.quizIntervalMinutes),
+    );
+
+    triggerTime = _adjustForQuietHours(
+      triggerTime,
+      child.quietHoursStart,
+      child.quietHoursEnd,
+    );
+
+    final delay = triggerTime.difference(DateTime.now());
+    if (delay.isNegative) return;
+
+    // Use a unique ID per child so re-scheduling replaces the previous one
+    final notificationId = child.id.hashCode.abs() % 100000;
+
+    Future.delayed(delay, () {
+      _localNotifications.show(
+        notificationId,
+        'Quiz Time! 🧠',
+        '${child.name}, ready for a quick quiz?',
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _androidChannel.id,
+            _androidChannel.name,
+            channelDescription: _androidChannel.description,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        payload: '/quiz/${child.id}',
+      );
+    });
+  }
+
+  /// Cancels any pending quiz notification for [childId].
+  Future<void> cancelQuizReminder(String childId) async {
+    final notificationId = childId.hashCode.abs() % 100000;
+    await _localNotifications.cancel(notificationId);
+  }
+
+  DateTime _adjustForQuietHours(DateTime time, int quietStart, int quietEnd) {
+    final hour = time.hour;
+
+    // Handle quiet hours that span midnight (e.g., 22:00 - 07:00)
+    if (quietStart > quietEnd) {
+      if (hour >= quietStart || hour < quietEnd) {
+        if (hour >= quietStart) {
+          return DateTime(time.year, time.month, time.day + 1, quietEnd);
+        } else {
+          return DateTime(time.year, time.month, time.day, quietEnd);
+        }
+      }
+    } else if (quietStart < quietEnd) {
+      // Quiet hours within same day (e.g., 13:00 - 15:00)
+      if (hour >= quietStart && hour < quietEnd) {
+        return DateTime(time.year, time.month, time.day, quietEnd);
+      }
+    }
+
+    return time;
   }
 
   /// Cancel all stream subscriptions. Called automatically by the

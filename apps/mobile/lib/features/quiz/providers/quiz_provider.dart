@@ -11,6 +11,7 @@ import '../../../shared/repositories/progress_repository.dart';
 import '../../../shared/repositories/questions_repository.dart';
 import '../../../shared/services/analytics_service.dart';
 import '../../../shared/services/quiz_engine.dart';
+import '../../../services/notification_service.dart';
 
 final _uuid = const Uuid();
 
@@ -192,6 +193,10 @@ class QuizNotifier extends AsyncNotifier<QuizState> {
       updatedProgress: updatedProgress,
       recentAttempts: updatedRecentAttempts,
     ));
+
+    if (isComplete && child != null) {
+      ref.read(notificationServiceProvider).scheduleNextQuiz(child);
+    }
   }
 }
 

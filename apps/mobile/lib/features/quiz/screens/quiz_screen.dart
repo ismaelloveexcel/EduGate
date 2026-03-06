@@ -15,15 +15,39 @@ class QuizScreen extends ConsumerStatefulWidget {
   ConsumerState<QuizScreen> createState() => _QuizScreenState();
 }
 
-class _QuizScreenState extends ConsumerState<QuizScreen> {
+class _QuizScreenState extends ConsumerState<QuizScreen>
+    with WidgetsBindingObserver {
   DateTime? _questionStartTime;
+  Duration _pausedElapsed = Duration.zero;
+  DateTime? _pauseStartTime;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(quizNotifierProvider.notifier).initialize(widget.childId);
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      if (_questionStartTime != null) {
+        _pauseStartTime = DateTime.now();
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      if (_pauseStartTime != null) {
+        _pausedElapsed += DateTime.now().difference(_pauseStartTime!);
+        _pauseStartTime = null;
+      }
+    }
   }
 
   void _onQuizStateChanged(QuizState quiz) {
@@ -84,9 +108,11 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             questionNumber: quiz.currentIndex + 1,
             totalQuestions: quiz.questions.length,
             onAnswer: (answer) {
-              final elapsed = DateTime.now()
-                  .difference(_questionStartTime ?? DateTime.now())
-                  .inMilliseconds;
+              final elapsed = (DateTime.now()
+                  .difference(_questionStartTime ?? DateTime.now()) - _pausedElapsed)
+                  .inMilliseconds
+                  .clamp(0, 600000);  // cap at 10 minutes
+              _pausedElapsed = Duration.zero;
               _questionStartTime = null;
               ref.read(quizNotifierProvider.notifier).submitAnswer(
                     question: question,
