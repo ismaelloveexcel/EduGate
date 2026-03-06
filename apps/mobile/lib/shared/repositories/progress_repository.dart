@@ -125,5 +125,42 @@ class ProgressRepository {
         .map((d) => AttemptModel.fromMap(d.data(), d.id))
         .toList();
   }
+
+  Future<void> purchaseCosmetic({
+    required String parentId,
+    required String childId,
+    required String itemId,
+    required int coinCost,
+  }) async {
+    final progressRef = _progressDoc(parentId, childId);
+    final ownedRef = _firestore
+        .collection('parents')
+        .doc(parentId)
+        .collection('children')
+        .doc(childId)
+        .collection('ownedCosmetics')
+        .doc(itemId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(progressRef);
+      final coins = snap.data()?['coins'] as int? ?? 0;
+      if (coins < coinCost) throw Exception('Not enough coins');
+      tx.update(progressRef, {'coins': coins - coinCost});
+      tx.set(ownedRef, {
+        'purchasedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+    });
+  }
+
+  Stream<Set<String>> watchOwnedCosmetics(String parentId, String childId) {
+    return _firestore
+        .collection('parents')
+        .doc(parentId)
+        .collection('children')
+        .doc(childId)
+        .collection('ownedCosmetics')
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.id).toSet());
+  }
 }
 
