@@ -4,18 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/repositories/auth_repository.dart';
-import '../../../shared/repositories/children_repository.dart';
 import '../../../shared/repositories/progress_repository.dart';
 import '../../../shared/models/child_model.dart';
 import '../../../shared/models/attempt_model.dart';
 import '../../../shared/models/progress_key.dart';
 import '../../../shared/models/progress_model.dart';
+import '../../children/providers/children_provider.dart';
 
 final _dashProgressStreamProvider =
     StreamProvider.family<ProgressModel, ProgressKey>((ref, key) {
   return ref
       .read(progressRepositoryProvider)
       .watchProgress(key.parentId, key.childId);
+});
+
+typedef _ChartKey = ({String parentId, String childId});
+final _last7DaysAttemptsProvider =
+    FutureProvider.family<List<AttemptModel>, _ChartKey>((ref, key) {
+  final now = DateTime.now();
+  final from = now.subtract(const Duration(days: 7));
+  return ref.read(progressRepositoryProvider).getAttemptsForDateRange(
+    key.parentId, key.childId, from: from, to: now,
+  );
 });
 
 class ParentDashboardScreen extends ConsumerWidget {
@@ -33,16 +43,10 @@ class ParentDashboardScreen extends ConsumerWidget {
         title: const Text('Parent Dashboard'),
         leading: BackButton(onPressed: () => context.go('/children')),
       ),
-      body: FutureBuilder<List<ChildModel>>(
-        future: ref.read(childrenRepositoryProvider).getChildren(user.uid),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(child: Text('Error: ${snap.error}'));
-          }
-          final children = snap.data ?? [];
+      body: ref.watch(childrenStreamProvider).when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (children) {
           if (children.isEmpty) {
             return const Center(child: Text('No children added yet.'));
           }
@@ -163,23 +167,17 @@ class _Last7DaysChart extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
-    final from = now.subtract(const Duration(days: 7));
+    final attemptsAsync = ref.watch(
+      _last7DaysAttemptsProvider((parentId: parentId, childId: childId)),
+    );
 
-    return FutureBuilder<List<AttemptModel>>(
-      future: ref.read(progressRepositoryProvider).getAttemptsForDateRange(
-            parentId,
-            childId,
-            from: from,
-            to: now,
-          ),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 80,
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        final attempts = snap.data ?? [];
+    return attemptsAsync.when(
+      loading: () => const SizedBox(
+        height: 80,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Text('Error: $e'),
+      data: (attempts) {
         if (attempts.isEmpty) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
@@ -188,7 +186,6 @@ class _Last7DaysChart extends ConsumerWidget {
           );
         }
 
-        // Group by day
         final Map<int, List<AttemptModel>> byDay = {};
         for (var i = 0; i < 7; i++) {
           byDay[i] = [];
