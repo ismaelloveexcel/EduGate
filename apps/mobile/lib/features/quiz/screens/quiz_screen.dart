@@ -1,4 +1,6 @@
 // lib/features/quiz/screens/quiz_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -119,6 +121,10 @@ class _QuestionWidget extends StatefulWidget {
 class _QuestionWidgetState extends State<_QuestionWidget> {
   String? _selectedOption;
   final _fillCtrl = TextEditingController();
+  bool _showingFeedback = false;
+  bool? _lastCorrect;
+  bool _submitting = false;
+  Timer? _feedbackTimer;
 
   @override
   void didUpdateWidget(_QuestionWidget oldWidget) {
@@ -126,16 +132,22 @@ class _QuestionWidgetState extends State<_QuestionWidget> {
     if (oldWidget.question.id != widget.question.id) {
       _selectedOption = null;
       _fillCtrl.clear();
+      _showingFeedback = false;
+      _lastCorrect = null;
+      _submitting = false;
     }
   }
 
   @override
   void dispose() {
+    _feedbackTimer?.cancel();
     _fillCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
+    if (_submitting) return;
+
     String answer = '';
     if (widget.question.type == QuestionType.fillInNumber) {
       answer = _fillCtrl.text.trim();
@@ -143,61 +155,89 @@ class _QuestionWidgetState extends State<_QuestionWidget> {
       answer = _selectedOption ?? '';
     }
     if (answer.isEmpty) return;
-    widget.onAnswer(answer);
+
+    final isCorrect = answer.trim().toLowerCase() ==
+        widget.question.correctAnswer.trim().toLowerCase();
+
+    setState(() {
+      _submitting = true;
+      _showingFeedback = true;
+      _lastCorrect = isCorrect;
+    });
+
+    _feedbackTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      setState(() {
+        _showingFeedback = false;
+        _lastCorrect = null;
+        _submitting = false;
+      });
+      widget.onAnswer(answer);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Progress indicator
-            LinearProgressIndicator(
-              value: widget.questionNumber / widget.totalQuestions,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Question ${widget.questionNumber} of ${widget.totalQuestions}',
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-            const SizedBox(height: 4),
-            Row(
+    return Stack(
+      children: [
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SubjectChip(subject: widget.question.subject),
-                const SizedBox(width: 8),
-                _DifficultyChip(difficulty: widget.question.difficulty),
+                // Progress indicator
+                LinearProgressIndicator(
+                  value: widget.questionNumber / widget.totalQuestions,
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Question ${widget.questionNumber} of ${widget.totalQuestions}',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    _SubjectChip(subject: widget.question.subject),
+                    const SizedBox(width: 8),
+                    _DifficultyChip(difficulty: widget.question.difficulty),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Question prompt
+                Text(
+                  widget.question.prompt,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 24),
+                // Answer area
+                Expanded(
+                  child: _buildAnswerArea(),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed:
+                        _canSubmit() && !_submitting ? _submit : null,
+                    child: const Text('Submit Answer',
+                        style: TextStyle(fontSize: 16)),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 24),
-            // Question prompt
-            Text(
-              widget.question.prompt,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 24),
-            // Answer area
-            Expanded(
-              child: _buildAnswerArea(),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _canSubmit() ? _submit : null,
-                child: const Text('Submit Answer',
-                    style: TextStyle(fontSize: 16)),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        if (_showingFeedback && _lastCorrect != null)
+          _FeedbackOverlay(
+            isCorrect: _lastCorrect!,
+            correctAnswer: widget.question.correctAnswer,
+          ),
+      ],
     );
   }
 
@@ -256,6 +296,57 @@ class _QuestionWidgetState extends State<_QuestionWidget> {
           ],
         );
     }
+  }
+}
+
+class _FeedbackOverlay extends StatelessWidget {
+  final bool isCorrect;
+  final String correctAnswer;
+
+  const _FeedbackOverlay({
+    required this.isCorrect,
+    required this.correctAnswer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor =
+        isCorrect ? Colors.green.withOpacity(0.85) : Colors.red.withOpacity(0.85);
+    return Container(
+      color: bgColor,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isCorrect ? Icons.check_circle : Icons.cancel,
+              size: 80,
+              color: Colors.white,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isCorrect ? 'Correct!' : 'Incorrect',
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            if (!isCorrect) ...[
+              const SizedBox(height: 12),
+              Text(
+                'The answer was: $correctAnswer',
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

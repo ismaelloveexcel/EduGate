@@ -1,4 +1,6 @@
 // lib/features/children/screens/pin_entry_screen.dart
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +20,8 @@ class _PinEntryScreenState extends ConsumerState<PinEntryScreen> {
   String _pin = '';
   String? _error;
   bool _loading = false;
+  int _failCount = 0;
+  DateTime? _lockoutUntil;
 
   void _onDigitTap(String digit) {
     if (_pin.length >= 6) return;
@@ -34,6 +38,15 @@ class _PinEntryScreenState extends ConsumerState<PinEntryScreen> {
   }
 
   Future<void> _tryVerify() async {
+    if (_lockoutUntil != null && DateTime.now().isBefore(_lockoutUntil!)) {
+      final remaining = _lockoutUntil!.difference(DateTime.now()).inSeconds + 1;
+      setState(() {
+        _error = 'Try again in $remaining seconds';
+        _pin = '';
+      });
+      return;
+    }
+
     final user = ref.read(authStateProvider).value;
     if (user == null) return;
 
@@ -47,10 +60,21 @@ class _PinEntryScreenState extends ConsumerState<PinEntryScreen> {
       );
 
       if (PinService.verifyPin(_pin, child.pinHash, salt: child.pinSalt)) {
+        _failCount = 0;
         if (mounted) context.go('/child-home/${widget.childId}');
       } else {
+        _failCount++;
+        String errorMsg = 'Incorrect PIN. Try again.';
+        if (_failCount >= 3) {
+          _lockoutUntil = DateTime.now()
+              .add(Duration(seconds: pow(2, _failCount - 2).toInt()));
+        }
+        if (_failCount >= 5) {
+          errorMsg =
+              'Too many failed attempts. Please wait before trying again.';
+        }
         setState(() {
-          _error = 'Incorrect PIN. Try again.';
+          _error = errorMsg;
           _pin = '';
         });
       }
