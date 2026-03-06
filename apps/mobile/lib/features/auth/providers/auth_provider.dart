@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/notification_service.dart';
 import '../../../shared/models/parent_model.dart';
 import '../../../shared/repositories/auth_repository.dart';
+import '../../../shared/services/analytics_service.dart';
 
 final authNotifierProvider =
     AsyncNotifierProvider<AuthNotifier, ParentModel?>(AuthNotifier.new);
@@ -33,6 +34,7 @@ class AuthNotifier extends AsyncNotifier<ParentModel?> {
         await ref
             .read(notificationServiceProvider)
             .registerToken(parentId: parent.id);
+        ref.read(analyticsServiceProvider).logLogin();
       }
       return parent;
     });
@@ -54,6 +56,7 @@ class AuthNotifier extends AsyncNotifier<ParentModel?> {
         await ref
             .read(notificationServiceProvider)
             .registerToken(parentId: parent.id);
+        ref.read(analyticsServiceProvider).logSignUp();
       }
       return parent;
     });

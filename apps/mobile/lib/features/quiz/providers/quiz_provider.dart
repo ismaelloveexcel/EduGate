@@ -9,6 +9,7 @@ import '../../../shared/repositories/auth_repository.dart';
 import '../../../shared/repositories/children_repository.dart';
 import '../../../shared/repositories/progress_repository.dart';
 import '../../../shared/repositories/questions_repository.dart';
+import '../../../shared/services/analytics_service.dart';
 import '../../../shared/services/quiz_engine.dart';
 
 final _uuid = const Uuid();
@@ -127,6 +128,11 @@ class QuizNotifier extends AsyncNotifier<QuizState> {
         parentId: user.uid,
         recentAttempts: recentAttempts,
       ));
+
+      ref.read(analyticsServiceProvider).logQuizStarted(
+            childId: childId,
+            questionCount: selected.length,
+          );
     } catch (e, st) {
       state = AsyncError(e, st);
     }
