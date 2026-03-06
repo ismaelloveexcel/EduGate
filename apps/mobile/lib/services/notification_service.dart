@@ -52,6 +52,8 @@ class NotificationService {
   StreamSubscription<RemoteMessage>? _foregroundMsgSub;
   StreamSubscription<RemoteMessage>? _backgroundTapSub;
 
+  String? _lastKnownToken;
+
   /// Initialise the service. Call once after [Firebase.initializeApp].
   ///
   /// [router] is used to navigate when a notification is tapped.
@@ -117,18 +119,29 @@ class NotificationService {
     _tokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
       _storeToken(parentId: parentId, token: newToken);
     });
+
+    _lastKnownToken = token;
   }
 
   Future<void> _storeToken({
     required String parentId,
     required String token,
   }) async {
-    await FirebaseFirestore.instance
+    final docRef = FirebaseFirestore.instance
         .collection(_kParentsCollection)
-        .doc(parentId)
-        .set({
-          'fcmTokens': FieldValue.arrayUnion([token]),
-        }, SetOptions(merge: true));
+        .doc(parentId);
+
+    await docRef.set({
+      'fcmTokens': FieldValue.arrayUnion([token]),
+    }, SetOptions(merge: true));
+
+    if (_lastKnownToken != null && _lastKnownToken != token) {
+      await docRef.update({
+        'fcmTokens': FieldValue.arrayRemove([_lastKnownToken!]),
+      });
+    }
+
+    _lastKnownToken = token;
     debugPrint('FCM token stored for parent $parentId');
   }
 
