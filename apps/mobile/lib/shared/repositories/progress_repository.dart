@@ -71,13 +71,12 @@ class ProgressRepository {
           ? ProgressModel.fromMap(progressSnap.data()!, attempt.childId)
           : ProgressModel(childId: attempt.childId);
 
-      ProgressModel next = current;
-      if (attempt.isCorrect) {
-        // Pass the attempt's own timestamp so that the streak/daily-count
-        // logic is consistent with the recorded createdAt, even if the
-        // Firestore transaction runs slightly later.
-        next = current.applyCorrectAnswer(now: attempt.createdAt);
-      }
+      // applyAttempt always increments daily count and manages streaks;
+      // XP/coins are only awarded when isCorrect is true.
+      ProgressModel next = current.applyAttempt(
+        isCorrect: attempt.isCorrect,
+        now: attempt.createdAt,
+      );
 
       // Update adaptive difficulty
       final updatedDifficulties = QuizEngine.computeUpdatedDifficulties(
@@ -125,6 +124,43 @@ class ProgressRepository {
     return snap.docs
         .map((d) => AttemptModel.fromMap(d.data(), d.id))
         .toList();
+  }
+
+  Future<void> purchaseCosmetic({
+    required String parentId,
+    required String childId,
+    required String itemId,
+    required int coinCost,
+  }) async {
+    final progressRef = _progressDoc(parentId, childId);
+    final ownedRef = _firestore
+        .collection('parents')
+        .doc(parentId)
+        .collection('children')
+        .doc(childId)
+        .collection('ownedCosmetics')
+        .doc(itemId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(progressRef);
+      final coins = snap.data()?['coins'] as int? ?? 0;
+      if (coins < coinCost) throw Exception('Not enough coins');
+      tx.update(progressRef, {'coins': coins - coinCost});
+      tx.set(ownedRef, {
+        'purchasedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+    });
+  }
+
+  Stream<Set<String>> watchOwnedCosmetics(String parentId, String childId) {
+    return _firestore
+        .collection('parents')
+        .doc(parentId)
+        .collection('children')
+        .doc(childId)
+        .collection('ownedCosmetics')
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.id).toSet());
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../../../shared/services/error_service.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -35,7 +36,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       if (mounted) context.go('/children');
     } catch (e) {
-      setState(() { _error = e.toString(); });
+      setState(() { _error = friendlyErrorMessage(e); });
     } finally {
       if (mounted) setState(() { _loading = false; });
     }

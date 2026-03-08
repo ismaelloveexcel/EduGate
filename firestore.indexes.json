@@ -4,7 +4,6 @@
       "collectionGroup": "attempts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "childId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
@@ -12,7 +11,6 @@
       "collectionGroup": "attempts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "childId", "order": "ASCENDING" },
         { "fieldPath": "subject", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]

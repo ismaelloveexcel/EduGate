@@ -9,7 +9,9 @@ import '../../../shared/repositories/auth_repository.dart';
 import '../../../shared/repositories/children_repository.dart';
 import '../../../shared/repositories/progress_repository.dart';
 import '../../../shared/repositories/questions_repository.dart';
+import '../../../shared/services/analytics_service.dart';
 import '../../../shared/services/quiz_engine.dart';
+import '../../../services/notification_service.dart';
 
 final _uuid = const Uuid();
 
@@ -72,7 +74,7 @@ class QuizState {
   int get coinsEarned => correctCount * kCoinsPerCorrect;
 }
 
-class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
+class QuizNotifier extends AsyncNotifier<QuizState> {
   late final String _childId;
 
   @override
@@ -83,7 +85,7 @@ class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
     state = const AsyncLoading();
 
     try {
-      final user = ref.read(authStateProvider).valueOrNull;
+      final user = ref.read(authStateProvider).value;
       if (user == null) throw Exception('Not authenticated');
 
       // Get child settings
@@ -127,6 +129,11 @@ class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
         parentId: user.uid,
         recentAttempts: recentAttempts,
       ));
+
+      ref.read(analyticsServiceProvider).logQuizStarted(
+            childId: childId,
+            questionCount: selected.length,
+          );
     } catch (e, st) {
       state = AsyncError(e, st);
     }
@@ -137,7 +144,7 @@ class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
     required String userAnswer,
     required int timeTakenMs,
   }) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
 
     // Use cached child and parentId — no extra Firestore reads per answer.
@@ -186,10 +193,14 @@ class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
       updatedProgress: updatedProgress,
       recentAttempts: updatedRecentAttempts,
     ));
+
+    if (isComplete && child != null) {
+      ref.read(notificationServiceProvider).scheduleNextQuiz(child);
+    }
   }
 }
 
 final quizNotifierProvider =
-    AsyncNotifierProvider.autoDispose<QuizNotifier, QuizState>(
+    AsyncNotifierProvider<QuizNotifier, QuizState>(
   QuizNotifier.new,
 );

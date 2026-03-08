@@ -3,56 +3,46 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/models/cosmetic_item_model.dart';
+import '../../../shared/models/progress_key.dart';
 import '../../../shared/repositories/auth_repository.dart';
 import '../../../shared/repositories/progress_repository.dart';
 import '../../../shared/models/progress_model.dart';
 
-/// Top-level provider so Riverpod can cache and share the stream subscription.
-typedef _ShopProgressKey = ({String parentId, String childId});
-
 final _shopProgressStreamProvider =
-    StreamProvider.family<ProgressModel, _ShopProgressKey>((ref, key) {
+    StreamProvider.family<ProgressModel, ProgressKey>((ref, key) {
   return ref
       .read(progressRepositoryProvider)
       .watchProgress(key.parentId, key.childId);
 });
 
-class CosmeticsShopScreen extends ConsumerStatefulWidget {
+final _ownedCosmeticsStreamProvider =
+    StreamProvider.family<Set<String>, ProgressKey>((ref, key) {
+  return ref
+      .read(progressRepositoryProvider)
+      .watchOwnedCosmetics(key.parentId, key.childId);
+});
+
+class CosmeticsShopScreen extends ConsumerWidget {
   final String childId;
   const CosmeticsShopScreen({super.key, required this.childId});
 
   @override
-  ConsumerState<CosmeticsShopScreen> createState() =>
-      _CosmeticsShopScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authStateProvider).value;
+    final key = user == null ? null : (parentId: user.uid, childId: childId);
 
-class _CosmeticsShopScreenState extends ConsumerState<CosmeticsShopScreen> {
-  // TODO (post-MVP): Replace in-memory ownership set with Firestore-backed
-  // persistence.  Suggested schema:
-  //   children/{childId}/ownedCosmetics/{itemId}  { purchasedAt: timestamp }
-  // Steps:
-  //   1. Add `ownedCosmeticsCol` to ProgressRepository (or a new CosmeticsRepository).
-  //   2. On purchase, run a Firestore transaction that:
-  //        a. Deducts coins from children/{childId}/progress/current.
-  //        b. Writes the item doc to ownedCosmetics/.
-  //   3. Load owned items via a StreamProvider so the UI reacts reactively.
-  //   4. Without this, purchased items are lost on app restart.
-  Set<String> _owned = {};
-
-  @override
-  Widget build(BuildContext context) {
-    final user = ref.watch(authStateProvider).valueOrNull;
-    final progressAsync = user == null
+    final progressAsync = key == null
         ? const AsyncValue<ProgressModel>.loading()
-        : ref.watch(
-            _shopProgressStreamProvider(
-                (parentId: user.uid, childId: widget.childId)),
-          );
+        : ref.watch(_shopProgressStreamProvider(key));
+
+    final ownedAsync = key == null
+        ? const AsyncValue<Set<String>>.loading()
+        : ref.watch(_ownedCosmeticsStreamProvider(key));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rewards Shop 🛒'),
-        leading: BackButton(onPressed: () => context.go('/child-home/${widget.childId}')),
+        leading: BackButton(onPressed: () => context.go('/child-home/$childId')),
         actions: [
           progressAsync.maybeWhen(
             data: (p) => Padding(
@@ -71,7 +61,7 @@ class _CosmeticsShopScreenState extends ConsumerState<CosmeticsShopScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (progress) => _ShopGrid(
           progress: progress,
-          owned: _owned,
+          owned: ownedAsync.asData?.value ?? {},
           onPurchase: (item) async {
             if (progress.coins < item.coinCost) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -79,11 +69,25 @@ class _CosmeticsShopScreenState extends ConsumerState<CosmeticsShopScreen> {
               );
               return;
             }
-            // TODO: Persist owned items to Firestore
-            setState(() => _owned.add(item.id));
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${item.name} purchased! 🎉')),
-            );
+            try {
+              await ref.read(progressRepositoryProvider).purchaseCosmetic(
+                    parentId: user!.uid,
+                    childId: childId,
+                    itemId: item.id,
+                    coinCost: item.coinCost,
+                  );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${item.name} purchased! 🎉')),
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Purchase failed: $e')),
+                );
+              }
+            }
           },
         ),
       ),

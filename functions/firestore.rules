@@ -16,18 +16,28 @@ service cloud.firestore {
     // --------------------------------------------------------
     match /parents/{parentId} {
       allow read:   if isOwner(parentId);
-      allow create: if isOwner(parentId);
+      allow create: if isOwner(parentId)
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string;
       allow update: if isOwner(parentId);
-      allow delete: if false; // prefer deactivation over deletion
+      allow delete: if false;
 
       // --------------------------------------------------------
       // parents/{parentId}/children/{childId}
       // --------------------------------------------------------
       match /children/{childId} {
         allow read:   if isOwner(parentId);
-        allow create: if isOwner(parentId);
-        allow update: if isOwner(parentId);
-        allow delete: if false; // prefer "archived" field instead
+        allow create: if isOwner(parentId)
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.age is int
+          && request.resource.data.age >= 3
+          && request.resource.data.age <= 18
+          && request.resource.data.pinHash is string;
+        allow update: if isOwner(parentId)
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0;
+        allow delete: if false;
 
         // --------------------------------------------------------
         // parents/{parentId}/children/{childId}/progress/main
@@ -35,7 +45,16 @@ service cloud.firestore {
         match /progress/{docId} {
           allow read:   if isOwner(parentId);
           allow create: if isOwner(parentId);
-          allow update: if isOwner(parentId);
+          allow update: if isOwner(parentId)
+            && request.resource.data.xp is int
+            && request.resource.data.xp >= 0
+            && request.resource.data.level is int
+            && request.resource.data.level >= 1
+            && request.resource.data.level <= 10
+            && request.resource.data.coins is int
+            && request.resource.data.coins >= 0
+            && request.resource.data.streakCount is int
+            && request.resource.data.streakCount >= 0;
           allow delete: if false;
         }
 
@@ -44,8 +63,23 @@ service cloud.firestore {
         // --------------------------------------------------------
         match /attempts/{attemptId} {
           allow read:   if isOwner(parentId);
+          allow create: if isOwner(parentId)
+            && request.resource.data.questionId is string
+            && request.resource.data.isCorrect is bool
+            && request.resource.data.timeTakenMs is int
+            && request.resource.data.timeTakenMs >= 0
+            && request.resource.data.createdAt is int;
+          allow update: if false;
+          allow delete: if false;
+        }
+
+        // --------------------------------------------------------
+        // parents/{parentId}/children/{childId}/ownedCosmetics/{itemId}
+        // --------------------------------------------------------
+        match /ownedCosmetics/{itemId} {
+          allow read:   if isOwner(parentId);
           allow create: if isOwner(parentId);
-          allow update: if false; // attempts are immutable once written
+          allow update: if false;
           allow delete: if false;
         }
       }
@@ -53,7 +87,6 @@ service cloud.firestore {
 
     // --------------------------------------------------------
     // questions/{questionId}
-    // Read-only to any authenticated user; writes via Admin SDK only.
     // --------------------------------------------------------
     match /questions/{questionId} {
       allow read:  if isSignedIn();

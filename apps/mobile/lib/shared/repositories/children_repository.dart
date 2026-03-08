@@ -26,6 +26,12 @@ class ChildrenRepository {
         .toList();
   }
 
+  Future<ChildModel> getChild(String parentId, String childId) async {
+    final doc = await _childrenCol(parentId).doc(childId).get();
+    if (!doc.exists) throw Exception('Child not found');
+    return ChildModel.fromMap(doc.data()!, doc.id);
+  }
+
   Stream<List<ChildModel>> watchChildren(String parentId) {
     return _childrenCol(parentId).snapshots().map(
           (snap) => snap.docs
