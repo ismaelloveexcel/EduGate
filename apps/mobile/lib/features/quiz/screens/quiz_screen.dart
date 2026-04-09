@@ -156,6 +156,8 @@ class _QuestionWidgetState extends State<_QuestionWidget> {
   void didUpdateWidget(_QuestionWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.question.id != widget.question.id) {
+      _feedbackTimer?.cancel();
+      _feedbackTimer = null;
       _selectedOption = null;
       _fillCtrl.clear();
       _showingFeedback = false;

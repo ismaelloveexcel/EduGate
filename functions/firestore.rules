@@ -44,15 +44,30 @@ service cloud.firestore {
         // --------------------------------------------------------
         match /progress/{docId} {
           allow read:   if isOwner(parentId);
-          allow create: if isOwner(parentId);
+          // Enforce that newly created progress docs start with zeroed counters
+          // so clients cannot bootstrap inflated XP/coin balances.
+          allow create: if isOwner(parentId)
+            && request.resource.data.xp is int
+            && request.resource.data.xp == 0
+            && request.resource.data.level is int
+            && request.resource.data.level == 1
+            && request.resource.data.coins is int
+            && request.resource.data.coins == 0
+            && request.resource.data.streakCount is int
+            && request.resource.data.streakCount == 0;
+          // Delta constraints prevent clients from arbitrarily inflating
+          // game state (XP, level, coins) without going through controlled
+          // app logic.
           allow update: if isOwner(parentId)
             && request.resource.data.xp is int
-            && request.resource.data.xp >= 0
+            && request.resource.data.xp >= resource.data.xp       // XP can only increase
+            && (request.resource.data.xp - resource.data.xp) <= 50 // Max 50 XP per update (5 Qs × 10 XP)
             && request.resource.data.level is int
-            && request.resource.data.level >= 1
+            && request.resource.data.level >= resource.data.level  // Level can only increase
             && request.resource.data.level <= 10
             && request.resource.data.coins is int
             && request.resource.data.coins >= 0
+            && request.resource.data.coins <= (resource.data.coins + 50) // Max +50 coins per update
             && request.resource.data.streakCount is int
             && request.resource.data.streakCount >= 0;
           allow delete: if false;
@@ -76,9 +91,16 @@ service cloud.firestore {
         // --------------------------------------------------------
         // parents/{parentId}/children/{childId}/ownedCosmetics/{itemId}
         // --------------------------------------------------------
+        // NOTE: Ideally, cosmetic purchases should be processed exclusively
+        // via a server-side Cloud Function (using Admin SDK) so that this
+        // rule can be set to `allow create: if false`. Until that migration
+        // is in place, we validate the document structure to at least
+        // prevent malformed writes and require a positive timestamp.
         match /ownedCosmetics/{itemId} {
           allow read:   if isOwner(parentId);
-          allow create: if isOwner(parentId);
+          allow create: if isOwner(parentId)
+            && request.resource.data.purchasedAt is int
+            && request.resource.data.purchasedAt > 0;
           allow update: if false;
           allow delete: if false;
         }

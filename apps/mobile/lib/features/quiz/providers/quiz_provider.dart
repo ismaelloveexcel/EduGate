@@ -74,7 +74,7 @@ class QuizState {
   int get coinsEarned => correctCount * kCoinsPerCorrect;
 }
 
-class QuizNotifier extends AsyncNotifier<QuizState> {
+class QuizNotifier extends AutoDisposeAsyncNotifier<QuizState> {
   late final String _childId;
 
   @override
@@ -201,6 +201,6 @@ class QuizNotifier extends AsyncNotifier<QuizState> {
 }
 
 final quizNotifierProvider =
-    AsyncNotifierProvider<QuizNotifier, QuizState>(
+    AsyncNotifierProvider.autoDispose<QuizNotifier, QuizState>(
   QuizNotifier.new,
 );

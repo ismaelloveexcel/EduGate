@@ -59,36 +59,40 @@ class CosmeticsShopScreen extends ConsumerWidget {
       body: progressAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (progress) => _ShopGrid(
-          progress: progress,
-          owned: ownedAsync.asData?.value ?? {},
-          onPurchase: (item) async {
-            if (progress.coins < item.coinCost) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Not enough coins!')),
-              );
-              return;
-            }
-            try {
-              await ref.read(progressRepositoryProvider).purchaseCosmetic(
-                    parentId: user!.uid,
-                    childId: childId,
-                    itemId: item.id,
-                    coinCost: item.coinCost,
+        data: (progress) => ownedAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error loading owned items: $e')),
+          data: (owned) => _ShopGrid(
+            progress: progress,
+            owned: owned,
+            onPurchase: (item) async {
+              if (progress.coins < item.coinCost) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Not enough coins!')),
+                );
+                return;
+              }
+              try {
+                await ref.read(progressRepositoryProvider).purchaseCosmetic(
+                      parentId: user!.uid,
+                      childId: childId,
+                      itemId: item.id,
+                      coinCost: item.coinCost,
+                    );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${item.name} purchased! 🎉')),
                   );
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${item.name} purchased! 🎉')),
-                );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Purchase failed: $e')),
+                  );
+                }
               }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Purchase failed: $e')),
-                );
-              }
-            }
-          },
+            },
+          ),
         ),
       ),
     );

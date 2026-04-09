@@ -21,6 +21,14 @@ final _dashProgressStreamProvider =
 typedef _ChartKey = ({String parentId, String childId});
 final _last7DaysAttemptsProvider =
     FutureProvider.family<List<AttemptModel>, _ChartKey>((ref, key) {
+  // Watch the progress stream so this provider is invalidated and refetched
+  // whenever progress (and thus attempts) change for this parent/child.
+  ref.watch(
+    _dashProgressStreamProvider(
+      ProgressKey(parentId: key.parentId, childId: key.childId),
+    ),
+  );
+
   final now = DateTime.now();
   final from = now.subtract(const Duration(days: 7));
   return ref.read(progressRepositoryProvider).getAttemptsForDateRange(

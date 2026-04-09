@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 import '../shared/models/child_model.dart';
 
@@ -162,6 +164,8 @@ class NotificationService {
   }
 
   Future<void> _initLocalNotifications() async {
+    tz.initializeTimeZones();
+
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const darwinInit = DarwinInitializationSettings(
       requestAlertPermission: false, // already handled by FCM
@@ -235,6 +239,8 @@ class NotificationService {
 
   /// Schedules a local quiz reminder for [child] after their configured interval.
   /// Respects quiet hours by adjusting the trigger time forward if needed.
+  /// Uses the OS-level alarm so the notification fires even when the app is
+  /// backgrounded or terminated.
   Future<void> scheduleNextQuiz(ChildModel child) async {
     var triggerTime = DateTime.now().add(
       Duration(minutes: child.quizIntervalMinutes),
@@ -246,41 +252,60 @@ class NotificationService {
       child.quietHoursEnd,
     );
 
-    final delay = triggerTime.difference(DateTime.now());
-    if (delay.isNegative) return;
+    if (triggerTime.isBefore(DateTime.now())) {
+      return;
+    }
 
-    // Use a unique ID per child so re-scheduling replaces the previous one
-    final notificationId = child.id.hashCode.abs() % 100000;
+    // Use a deterministic ID derived from the child ID string so that
+    // re-scheduling replaces the previous one and cancelQuizReminder works
+    // reliably across app restarts (unlike Dart's hashCode, which is not
+    // stable between isolate runs).
+    final notificationId = _stableIdFromString(child.id);
 
-    Future.delayed(delay, () {
-      _localNotifications.show(
-        notificationId,
-        'Quiz Time! 🧠',
-        '${child.name}, ready for a quick quiz?',
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _androidChannel.id,
-            _androidChannel.name,
-            channelDescription: _androidChannel.description,
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
+    final scheduledDate = tz.TZDateTime.from(triggerTime, tz.local);
+
+    await _localNotifications.zonedSchedule(
+      notificationId,
+      'Quiz Time! 🧠',
+      '${child.name}, ready for a quick quiz?',
+      scheduledDate,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _androidChannel.id,
+          _androidChannel.name,
+          channelDescription: _androidChannel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
         ),
-        payload: '/quiz/${child.id}',
-      );
-    });
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: '/quiz/${child.id}',
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
   }
 
   /// Cancels any pending quiz notification for [childId].
   Future<void> cancelQuizReminder(String childId) async {
-    final notificationId = childId.hashCode.abs() % 100000;
+    final notificationId = _stableIdFromString(childId);
     await _localNotifications.cancel(notificationId);
+  }
+
+  /// Returns a stable notification ID derived from [input] by summing the
+  /// UTF-16 code units and taking the result modulo 100 000.
+  /// This is deterministic across app launches (unlike [Object.hashCode]).
+  int _stableIdFromString(String input) {
+    var sum = 0;
+    for (final codeUnit in input.codeUnits) {
+      sum += codeUnit;
+    }
+    return sum % 100000;
   }
 
   DateTime _adjustForQuietHours(DateTime time, int quietStart, int quietEnd) {

@@ -132,6 +132,8 @@ class ProgressRepository {
     required String itemId,
     required int coinCost,
   }) async {
+    if (coinCost <= 0) throw ArgumentError('coinCost must be positive');
+
     final progressRef = _progressDoc(parentId, childId);
     final ownedRef = _firestore
         .collection('parents')
@@ -142,8 +144,12 @@ class ProgressRepository {
         .doc(itemId);
 
     await _firestore.runTransaction((tx) async {
-      final snap = await tx.get(progressRef);
-      final coins = snap.data()?['coins'] as int? ?? 0;
+      // Check idempotency: if item is already owned, do not deduct coins again.
+      final ownedSnap = await tx.get(ownedRef);
+      if (ownedSnap.exists) return;
+
+      final progressSnap = await tx.get(progressRef);
+      final coins = progressSnap.data()?['coins'] as int? ?? 0;
       if (coins < coinCost) throw Exception('Not enough coins');
       tx.update(progressRef, {'coins': coins - coinCost});
       tx.set(ownedRef, {
