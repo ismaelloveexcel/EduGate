@@ -58,6 +58,9 @@ service cloud.firestore {
           // Delta constraints prevent clients from arbitrarily inflating
           // game state (XP, level, coins) without going through controlled
           // app logic.
+          // Upper bounds are derived from one quiz session:
+          //   5 questions × 10 XP per correct answer = 50 XP max per update
+          //   5 questions × 10 coins per correct answer = 50 coins max per update
           allow update: if isOwner(parentId)
             && request.resource.data.xp is int
             && request.resource.data.xp >= resource.data.xp       // XP can only increase
@@ -67,7 +70,7 @@ service cloud.firestore {
             && request.resource.data.level <= 10
             && request.resource.data.coins is int
             && request.resource.data.coins >= 0
-            && request.resource.data.coins <= (resource.data.coins + 50) // Max +50 coins per update
+            && request.resource.data.coins <= (resource.data.coins + 50) // Max +50 coins per update (5 Qs × 10 coins)
             && request.resource.data.streakCount is int
             && request.resource.data.streakCount >= 0;
           allow delete: if false;

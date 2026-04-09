@@ -146,7 +146,12 @@ class ProgressRepository {
     await _firestore.runTransaction((tx) async {
       // Check idempotency: if item is already owned, do not deduct coins again.
       final ownedSnap = await tx.get(ownedRef);
-      if (ownedSnap.exists) return;
+      if (ownedSnap.exists) {
+        // Item was already owned (e.g. a duplicate tap or network retry).
+        // The caller can detect this by checking ownership state from the
+        // stream rather than relying on this silent no-op.
+        return;
+      }
 
       final progressSnap = await tx.get(progressRef);
       final coins = progressSnap.data()?['coins'] as int? ?? 0;

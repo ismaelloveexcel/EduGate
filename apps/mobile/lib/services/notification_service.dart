@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -297,15 +299,18 @@ class NotificationService {
     await _localNotifications.cancel(notificationId);
   }
 
-  /// Returns a stable notification ID derived from [input] by summing the
-  /// UTF-16 code units and taking the result modulo 100 000.
-  /// This is deterministic across app launches (unlike [Object.hashCode]).
+  /// Returns a stable notification ID derived from [input] using SHA-256.
+  /// Takes the first 4 bytes of the digest and maps the result to 0–99 999.
+  /// This is collision-resistant and deterministic across app launches
+  /// (unlike [Object.hashCode]).
   int _stableIdFromString(String input) {
-    var sum = 0;
-    for (final codeUnit in input.codeUnits) {
-      sum += codeUnit;
-    }
-    return sum % 100000;
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    final value = (digest.bytes[0] << 24) |
+        (digest.bytes[1] << 16) |
+        (digest.bytes[2] << 8) |
+        digest.bytes[3];
+    return value.abs() % 100000;
   }
 
   DateTime _adjustForQuietHours(DateTime time, int quietStart, int quietEnd) {
