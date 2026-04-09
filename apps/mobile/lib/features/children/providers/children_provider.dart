@@ -5,7 +5,7 @@ import '../../../shared/repositories/auth_repository.dart';
 import '../../../shared/repositories/children_repository.dart';
 
 final childrenStreamProvider = StreamProvider<List<ChildModel>>((ref) {
-  final user = ref.watch(authStateProvider).valueOrNull;
+  final user = ref.watch(authStateProvider).value;
   if (user == null) return const Stream.empty();
   return ref.watch(childrenRepositoryProvider).watchChildren(user.uid);
 });

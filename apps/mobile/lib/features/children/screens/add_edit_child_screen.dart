@@ -45,7 +45,7 @@ class _AddEditChildScreenState extends ConsumerState<AddEditChildScreen> {
     setState(() { _loading = true; _error = null; });
 
     try {
-      final user = ref.read(authStateProvider).valueOrNull;
+      final user = ref.read(authStateProvider).value;
       if (user == null) throw Exception('Not signed in');
 
       final repo = ref.read(childrenRepositoryProvider);

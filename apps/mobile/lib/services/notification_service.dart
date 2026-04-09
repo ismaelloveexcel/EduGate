@@ -1,12 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+
+import '../shared/models/child_model.dart';
 
 /// Top-level handler for background/terminated FCM messages.
 /// Must be a top-level function (not a class method).
@@ -51,6 +57,8 @@ class NotificationService {
   StreamSubscription<String>? _tokenRefreshSub;
   StreamSubscription<RemoteMessage>? _foregroundMsgSub;
   StreamSubscription<RemoteMessage>? _backgroundTapSub;
+
+  String? _lastKnownToken;
 
   /// Initialise the service. Call once after [Firebase.initializeApp].
   ///
@@ -117,18 +125,29 @@ class NotificationService {
     _tokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
       _storeToken(parentId: parentId, token: newToken);
     });
+
+    _lastKnownToken = token;
   }
 
   Future<void> _storeToken({
     required String parentId,
     required String token,
   }) async {
-    await FirebaseFirestore.instance
+    final docRef = FirebaseFirestore.instance
         .collection(_kParentsCollection)
-        .doc(parentId)
-        .set({
-          'fcmTokens': FieldValue.arrayUnion([token]),
-        }, SetOptions(merge: true));
+        .doc(parentId);
+
+    await docRef.set({
+      'fcmTokens': FieldValue.arrayUnion([token]),
+    }, SetOptions(merge: true));
+
+    if (_lastKnownToken != null && _lastKnownToken != token) {
+      await docRef.update({
+        'fcmTokens': FieldValue.arrayRemove([_lastKnownToken!]),
+      });
+    }
+
+    _lastKnownToken = token;
     debugPrint('FCM token stored for parent $parentId');
   }
 
@@ -147,6 +166,8 @@ class NotificationService {
   }
 
   Future<void> _initLocalNotifications() async {
+    tz.initializeTimeZones();
+
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const darwinInit = DarwinInitializationSettings(
       requestAlertPermission: false, // already handled by FCM
@@ -212,6 +233,106 @@ class NotificationService {
     if (route != null && route.isNotEmpty && _router != null) {
       _router!.go(route);
     }
+  }
+
+  // -------------------------------------------------------
+  // Quiz reminder scheduling
+  // -------------------------------------------------------
+
+  /// Schedules a local quiz reminder for [child] after their configured interval.
+  /// Respects quiet hours by adjusting the trigger time forward if needed.
+  /// Uses the OS-level alarm so the notification fires even when the app is
+  /// backgrounded or terminated.
+  Future<void> scheduleNextQuiz(ChildModel child) async {
+    var triggerTime = DateTime.now().add(
+      Duration(minutes: child.quizIntervalMinutes),
+    );
+
+    triggerTime = _adjustForQuietHours(
+      triggerTime,
+      child.quietHoursStart,
+      child.quietHoursEnd,
+    );
+
+    if (triggerTime.isBefore(DateTime.now())) {
+      return;
+    }
+
+    // Use a deterministic ID derived from the child ID string so that
+    // re-scheduling replaces the previous one and cancelQuizReminder works
+    // reliably across app restarts (unlike Dart's hashCode, which is not
+    // stable between isolate runs).
+    final notificationId = _stableIdFromString(child.id);
+
+    final scheduledDate = tz.TZDateTime.from(triggerTime, tz.local);
+
+    await _localNotifications.zonedSchedule(
+      notificationId,
+      'Quiz Time! 🧠',
+      '${child.name}, ready for a quick quiz?',
+      scheduledDate,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _androidChannel.id,
+          _androidChannel.name,
+          channelDescription: _androidChannel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: '/quiz/${child.id}',
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  /// Cancels any pending quiz notification for [childId].
+  Future<void> cancelQuizReminder(String childId) async {
+    final notificationId = _stableIdFromString(childId);
+    await _localNotifications.cancel(notificationId);
+  }
+
+  /// Returns a stable notification ID derived from [input] using SHA-256.
+  /// Takes the first 4 bytes of the digest and maps the result to 0–99 999.
+  /// This is collision-resistant and deterministic across app launches
+  /// (unlike [Object.hashCode]).
+  int _stableIdFromString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    final value = (digest.bytes[0] << 24) |
+        (digest.bytes[1] << 16) |
+        (digest.bytes[2] << 8) |
+        digest.bytes[3];
+    return value.abs() % 100000;
+  }
+
+  DateTime _adjustForQuietHours(DateTime time, int quietStart, int quietEnd) {
+    final hour = time.hour;
+
+    // Handle quiet hours that span midnight (e.g., 22:00 - 07:00)
+    if (quietStart > quietEnd) {
+      if (hour >= quietStart || hour < quietEnd) {
+        if (hour >= quietStart) {
+          return DateTime(time.year, time.month, time.day + 1, quietEnd);
+        } else {
+          return DateTime(time.year, time.month, time.day, quietEnd);
+        }
+      }
+    } else if (quietStart < quietEnd) {
+      // Quiet hours within same day (e.g., 13:00 - 15:00)
+      if (hour >= quietStart && hour < quietEnd) {
+        return DateTime(time.year, time.month, time.day, quietEnd);
+      }
+    }
+
+    return time;
   }
 
   /// Cancel all stream subscriptions. Called automatically by the

@@ -16,6 +16,8 @@ class QuizEngine {
   /// [progress] – child's current progress (contains difficultyBySubject).
   /// [subjectsEnabled] – which subjects to include.
   /// [count] – number of questions to return.
+  static const int kAvoidLastN = 10;
+
   static List<QuestionModel> selectQuestions({
     required List<QuestionModel> allQuestions,
     required List<AttemptModel> recentAttempts,
@@ -25,10 +27,25 @@ class QuizEngine {
   }) {
     if (allQuestions.isEmpty || subjectsEnabled.isEmpty) return [];
 
-    // Filter by enabled subjects
+    final recentIds =
+        recentAttempts.take(kAvoidLastN).map((a) => a.questionId).toSet();
+
+    // Filter by enabled subjects and exclude recently-attempted questions
     final eligible = allQuestions
         .where((q) => subjectsEnabled.contains(q.subject))
+        .where((q) => !recentIds.contains(q.id))
         .toList();
+
+    // Fall back to full pool if dedup leaves too few questions
+    if (eligible.length < count) {
+      final fallback = allQuestions
+          .where((q) => subjectsEnabled.contains(q.subject))
+          .toList();
+      if (fallback.length > eligible.length) {
+        return _scoreAndSelect(fallback, recentAttempts, progress,
+            subjectsEnabled, count);
+      }
+    }
 
     if (eligible.isEmpty) return [];
 
@@ -50,6 +67,29 @@ class QuizEngine {
     scored.shuffle();
     scored.sort((a, b) => b.score.compareTo(a.score));
 
+    return scored.take(count).map((s) => s.question).toList();
+  }
+
+  static List<QuestionModel> _scoreAndSelect(
+    List<QuestionModel> pool,
+    List<AttemptModel> recentAttempts,
+    ProgressModel progress,
+    List<String> subjects,
+    int count,
+  ) {
+    if (pool.isEmpty) return [];
+    final targetDifficulty = _computeTargetDifficulties(
+      recentAttempts: recentAttempts,
+      progress: progress,
+      subjects: subjects,
+    );
+    final scored = pool.map((q) {
+      final target = targetDifficulty[q.subject] ?? Difficulty.easy;
+      final diffMatch = q.difficulty == target ? 2 : 1;
+      return _ScoredQuestion(q, diffMatch);
+    }).toList();
+    scored.shuffle();
+    scored.sort((a, b) => b.score.compareTo(a.score));
     return scored.take(count).map((s) => s.question).toList();
   }
 

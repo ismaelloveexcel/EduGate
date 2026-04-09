@@ -6,23 +6,18 @@ import '../../../shared/repositories/auth_repository.dart';
 import '../../../shared/repositories/children_repository.dart';
 import '../../../shared/repositories/progress_repository.dart';
 import '../../../shared/models/child_model.dart';
+import '../../../shared/models/progress_key.dart';
 import '../../../shared/models/progress_model.dart';
 
 final _childProvider =
     FutureProvider.family<ChildModel?, String>((ref, childId) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
+  final user = ref.watch(authStateProvider).value;
   if (user == null) return null;
-  final children =
-      await ref.read(childrenRepositoryProvider).getChildren(user.uid);
-  return children.firstWhere((c) => c.id == childId,
-      orElse: () => throw Exception('Child not found'));
+  return ref.read(childrenRepositoryProvider).getChild(user.uid, childId);
 });
 
-/// Top-level provider so Riverpod can cache and share the stream subscription.
-typedef _ProgressKey = ({String parentId, String childId});
-
 final _progressStreamProvider =
-    StreamProvider.family<ProgressModel, _ProgressKey>((ref, key) {
+    StreamProvider.family<ProgressModel, ProgressKey>((ref, key) {
   return ref
       .read(progressRepositoryProvider)
       .watchProgress(key.parentId, key.childId);
@@ -34,7 +29,7 @@ class ChildHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authStateProvider).valueOrNull;
+    final user = ref.watch(authStateProvider).value;
     final childAsync = ref.watch(_childProvider(childId));
     final progressAsync = user == null
         ? const AsyncValue<ProgressModel>.loading()

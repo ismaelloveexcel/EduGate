@@ -161,6 +161,52 @@ class ProgressModel extends Equatable {
     );
   }
 
+  /// Returns updated ProgressModel after any attempt (correct or incorrect).
+  /// Always increments [dailyAttemptsToday] and updates streak tracking,
+  /// but only awards XP/coins for correct answers.
+  ProgressModel applyAttempt({required bool isCorrect, DateTime? now}) {
+    final today = now ?? DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+
+    final lastAttempt = lastAttemptDate != null
+        ? DateTime(
+            lastAttemptDate!.year, lastAttemptDate!.month, lastAttemptDate!.day)
+        : null;
+    final isNewDay = lastAttempt == null || todayDate.isAfter(lastAttempt);
+    final newDailyAttempts = isNewDay ? 1 : dailyAttemptsToday + 1;
+
+    final previousDayDate = todayDate.subtract(const Duration(days: 1));
+    final isFirstTimeMinMet = newDailyAttempts == kDailyMinAttempts;
+
+    int newStreak = streakCount;
+    DateTime? newLastMinMetDate = lastMinMetDate;
+
+    if (isFirstTimeMinMet) {
+      newLastMinMetDate = today;
+      final lastMinMet = lastMinMetDate != null
+          ? DateTime(lastMinMetDate!.year, lastMinMetDate!.month,
+              lastMinMetDate!.day)
+          : null;
+      final yesterdayMinWasMet =
+          lastMinMet != null && lastMinMet.isAtSameMomentAs(previousDayDate);
+      newStreak = yesterdayMinWasMet ? streakCount + 1 : 1;
+    }
+
+    final newXp = isCorrect ? xp + kXpPerCorrect : xp;
+    final newCoins = isCorrect ? coins + kCoinsPerCorrect : coins;
+    final newLevel = computeLevel(newXp);
+
+    return copyWith(
+      xp: newXp,
+      level: newLevel,
+      coins: newCoins,
+      streakCount: newStreak,
+      lastMinMetDate: newLastMinMetDate,
+      lastAttemptDate: today,
+      dailyAttemptsToday: newDailyAttempts,
+    );
+  }
+
   /// Adaptive difficulty: given recent accuracy for a subject, adjust difficulty.
   Difficulty adaptiveDifficulty(String subject, double recentAccuracy) {
     final current = Difficulty.values.firstWhere(
